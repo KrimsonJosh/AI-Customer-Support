@@ -1,117 +1,122 @@
 'use client'
 
-import { Box, Button, Stack, TextField } from '@mui/material'
-import { useState } from 'react'
+import Image from "next/image";
+import { Box, Stack,TextField,Button } from "@mui/material";
+import { useState } from "react";
+
 
 export default function Home() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: "Hi! I'm the Headstarter support assistant. How can I help you today?",
-    },
-  ])
-  const [message, setMessage] = useState('')
+  const [messages,setMessages] = useState([])
+
+  const [message,setMessage] = useState('')
 
   const sendMessage = async () => {
-    
-      setMessage('')  // Clear the input field
-      setMessages((messages) => [
-        ...messages,
-        { role: 'user', content: message },  // Add the user's message to the chat
-        { role: 'assistant', content: '' },  // Add a placeholder for the assistant's response
-      ])
-    
-      // Send the message to the server
-      const response = fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
-      }).then(async (res) => {
-        const reader = res.body.getReader()  // Get a reader to read the response body
-        const decoder = new TextDecoder()  // Create a decoder to decode the response text
-    
-        let result = ''
-        // Function to process the text from the response
-        return reader.read().then(function processText({ done, value }) {
-          if (done) {
-            return result
-          }
-          const text = decoder.decode(value || new Uint8Array(), { stream: true })  // Decode the text
-          setMessages((messages) => {
-            let lastMessage = messages[messages.length - 1]  // Get the last message (assistant's placeholder)
-            let otherMessages = messages.slice(0, messages.length - 1)  // Get all other messages
-            return [
-              ...otherMessages,
-              { ...lastMessage, content: lastMessage.content + text },  // Append the decoded text to the assistant's message
-            ]
-          })
-          return reader.read().then(processText)  // Continue reading the next chunk of the response
+    setMessage('')
+    setMessages((messages) => [
+      ...messages,
+      {role:'user', parts:[{text:message}]},
+      {role:'model', parts:[{text:''}]}
+    ])
+
+    const response = fetch('/api/chat',{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([...messages, {role:'user', parts:[{text:message}] }])
+    }).then(async(res) => {
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+
+      let result = ''
+      return reader.read().then(function proccessText({done, value}){
+        
+        if(done){
+          return result
+        }
+        const text = decoder.decode(value || new Int8Array(), {stream:true})
+        setMessages((messages) => {
+          
+          let lastMessage = messages[messages.length - 1]
+          let otherMessages = messages.slice(0, messages.length -1)
+          return [
+            ...otherMessages,
+            {
+              role:lastMessage.role,
+              parts: [{text:lastMessage.parts[0].text + text}]
+            }
+          ]
         })
+        console.log(messages)
+        return reader.read().then(proccessText)
+
+        
       })
-    
+    }).catch(err => console.log(err))
   }
 
-  return (
-    <Box
-      width="100vw"
+    return(
+      <Box
       height="100vh"
-      display="flex"
-      flexDirection="column"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Stack
-        direction={'column'}
-        width="500px"
-        height="700px"
-        border="1px solid black"
-        p={2}
-        spacing={3}
-      >
+      width="100vw"
+      display={"flex"}
+      justifyContent={"center"}
+      alignItems={"center"}>
+        
+
         <Stack
-          direction={'column'}
+        direction={"column"}
+        height="600px"
+        width="800px"
+        display={"flex"}
+        border={'1px solid black'}
+        borderRadius={'20px'}
+        p={5}>
+                    
+          <Stack
+          flexBasis={"80%"}
+          display={"flex"}
+          width={"100%"}
+          direction={"column"}
           spacing={2}
-          flexGrow={1}
-          overflow="auto"
-          maxHeight="100%"
-        >
-          {messages.map((message, index) => (
-            <Box
-              key={index}
-              display="flex"
-              justifyContent={
-                message.role === 'assistant' ? 'flex-start' : 'flex-end'
-              }
-            >
-              <Box
-                bgcolor={
-                  message.role === 'assistant'
-                    ? 'primary.main'
-                    : 'secondary.main'
-                }
-                color="white"
-                borderRadius={16}
-                p={3}
-              >
-                {message.content}
+          overflow={"auto"}
+          >
+            {messages.map((message)=>{
+              return <Box
+              
+              fontSize={"1.5rem"}
+              p={"5px"}
+              maxWidth={"70%"}
+              borderRadius={"10px"}
+              alignSelf={message.role === "model"?"flex-start":"flex-end"}
+              backgroundColor={message.role == "model"?"#E0B0FF": "#FAE6FA"}
+              >{message.parts[0].text}
+                
               </Box>
-            </Box>
-          ))}
+            })}
+          </Stack>
+
+          <Stack
+          flexBasis={"20%"}
+          display="flex"
+          flexDirection={"row"}
+          p={3}
+          width={"100%"}
+          spacing={2}
+          direction={"row"}>
+          <TextField fullWidth
+          id="message" 
+          label="Tell me about..." 
+          variant="outlined"
+          value={message}
+          onChange={(e)=>{setMessage(e.target.value)}} />
+          <Button onClick={sendMessage}
+          variant="contained">Send</Button>
+          </Stack>
+              
+          
+
         </Stack>
-        <Stack direction={'row'} spacing={2}>
-          <TextField
-            label="Message"
-            fullWidth
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button variant="contained" onClick={sendMessage}>
-            Send
-          </Button>
-        </Stack>
-      </Stack>
-    </Box>
-  )
+      </Box>
+    )
 }
